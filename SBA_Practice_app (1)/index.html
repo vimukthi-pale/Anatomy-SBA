@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SBA Practice">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F3F4F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Anatomy SBA Practice</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<style>
+/* Layout: one reading column (max 760px) — topic shelf → question card → answer reveal, sticky action bar at the bottom for thumb reach on iPad/iPhone */
+:root{
+  --bg:#F3F4F1; --surface:#FFFFFF; --sunk:#E9EBE6; --line:#D9DCD4;
+  --ink:#1A211E; --muted:#5C6661; --accent:#2F43A0; --accent-ink:#FFFFFF; --accent-soft:#E3E7F7;
+  --ok:#1E7A4C; --ok-soft:#E1F2E8; --bad:#B3302B; --bad-soft:#F8E3E1; --warn:#8A5B00; --warn-soft:#FBF0D6;
+  --f-display:ui-sans-serif,system-ui,sans-serif;
+  --f-body:-apple-system,"Segoe UI",system-ui,sans-serif;
+  --f-mono:ui-monospace,Menlo,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121614; --surface:#1B201E; --sunk:#232927; --line:#323A36;
+  --ink:#E8ECE9; --muted:#9AA59F; --accent:#8C9DF0; --accent-ink:#0F1430; --accent-soft:#252C4D;
+  --ok:#5CCB8F; --ok-soft:#18382A; --bad:#F08A84; --bad-soft:#40201E; --warn:#E8B85A; --warn-soft:#3A2E14; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121614; --surface:#1B201E; --sunk:#232927; --line:#323A36;
+  --ink:#E8ECE9; --muted:#9AA59F; --accent:#8C9DF0; --accent-ink:#0F1430; --accent-soft:#252C4D;
+  --ok:#5CCB8F; --ok-soft:#18382A; --bad:#F08A84; --bad-soft:#40201E; --warn:#E8B85A; --warn-soft:#3A2E14; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.55 var(--f-body);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button{font:inherit;color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 120px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* home */
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-block:8px 18px}
+.brand h1{font-size:clamp(28px,6vw,40px);font-weight:700;letter-spacing:-.01em}
+.brand p{margin:4px 0 0;color:var(--muted)}
+.stats{display:flex;gap:18px;color:var(--muted);font-size:15px}
+.stats b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:26px}
+.mode{display:flex;flex-direction:column;gap:2px;text-align:left;padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);cursor:pointer;min-height:64px}
+.mode strong{font-family:var(--f-display);font-weight:700;font-size:17px}
+.mode span{color:var(--muted);font-size:14px}
+.mode.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mode.primary span{color:inherit;opacity:.85}
+.mode:disabled{opacity:.5;cursor:default}
+.group-h{margin:22px 0 8px}
+.topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+.topic{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 12px;text-align:left;padding:13px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;min-height:64px}
+.topic .name{font-weight:700;font-size:17px}
+.topic .meta{grid-column:1;color:var(--muted);font-size:14px}
+.topic .score{grid-row:1/3;grid-column:2;text-align:right;font-size:14px;color:var(--muted)}
+.bar{grid-column:1/3;height:4px;border-radius:2px;background:var(--sunk);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.bar .c{background:var(--ok)} .bar .w{background:var(--bad)}
+.foot{margin-top:28px;color:var(--muted);font-size:14px;max-width:62ch}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-size:14px}
+
+/* quiz */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;padding-block:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;font-size:15px}
+.top .where{flex:1;min-width:0}
+.top .where .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .where .s{font-size:13px;color:var(--muted)}
+.progress{height:3px;background:var(--sunk);border-radius:2px;overflow:hidden;margin-top:6px}
+.progress i{display:block;height:100%;background:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 20px}
+.stem p{margin:0 0 .7em}
+.stem p:last-child{font-weight:700;margin-bottom:0}
+.note{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:15px;margin-bottom:12px}
+figure{margin:14px 0 4px;text-align:center}
+figure img{border-radius:10px;border:1px solid var(--line);max-height:60vh;max-width:100%;height:auto;width:auto;cursor:zoom-in;background:#fff}
+.opts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.opt{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:12px;text-align:left;width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;min-height:56px;font-size:17px;line-height:1.35;transition:border-color .15s,background .15s}
+.opt .L{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--sunk);font-family:var(--f-mono);font-weight:500}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt:focus-visible,.iconbtn:focus-visible,.mode:focus-visible,.topic:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt:disabled{cursor:default}
+.opt.correct{border-color:var(--ok);background:var(--ok-soft)}
+.opt.correct .L{background:var(--ok);color:var(--surface)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.wrong .L{background:var(--bad);color:var(--surface)}
+.opt.dim{opacity:.6}
+.verdict{scroll-margin-top:calc(84px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-family:var(--f-display);font-size:21px;font-weight:700}
+.verdict.ok{color:var(--ok)} .verdict.bad{color:var(--bad)}
+.exp{display:flex;flex-direction:column;gap:10px}
+.xp{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.xp h3{font-family:var(--f-body);font-size:16px;font-weight:700;display:flex;gap:10px;align-items:baseline;padding:11px 14px;background:var(--sunk)}
+.xp h3 .tag{margin-left:auto;font-size:12px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.xp.is-correct{border-color:var(--ok)}
+.xp.is-correct h3{background:var(--ok-soft);color:var(--ok)}
+.xp.is-chosen h3{background:var(--bad-soft);color:var(--bad)}
+.xp .body{padding:10px 14px 12px}
+.xp .body p{margin:0 0 .6em}
+.xp .body p:last-child{margin-bottom:0}
+.xp .empty{color:var(--muted);font-style:italic}
+.actions{position:fixed;left:0;right:0;bottom:0;z-index:6;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.actions .in{max-width:760px;margin:0 auto;display:flex;gap:10px}
+.btn{flex:1;height:52px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:17px;cursor:pointer}
+.btn.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.45;cursor:default}
+.src{margin-top:14px;font-size:13px;color:var(--muted)}
+.lightbox{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.88);display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.lightbox img{max-width:100%;max-height:100%;border-radius:8px;background:#fff}
+.done{text-align:center;padding:28px 18px}
+.done .big{font-family:var(--f-display);font-size:52px;font-weight:700}
+.loading{color:var(--muted);padding:40px 0;text-align:center}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+.lock{max-width:420px;margin:12vh auto 0;display:flex;flex-direction:column;gap:14px}
+.lock input{height:52px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:18px;padding:0 14px}
+.lock input:focus{outline:3px solid var(--accent);outline-offset:1px}
+.lock .err{color:var(--bad);min-height:1.4em;margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}
+</style>
+
+</head><body>
+<div id="app" class="wrap"><p class="loading">Loading questions…</p></div>
+<div id="actions" class="actions" hidden><div class="in">
+  <button class="btn" id="prevBtn" type="button">Previous</button>
+  <button class="btn go" id="nextBtn" type="button">Next</button>
+</div></div>
+<div id="lightbox" class="lightbox" hidden><img id="lbImg" alt=""></div>
+
+<script>
+const MANIFEST = {"topics":[{"slug":"Head_and_Neck","title":"Head and Neck","group":"Anatomy","count":101,"ids":["Head_and_Neck-100-1","Head_and_Neck-5-1","Head_and_Neck-5-2","Head_and_Neck-5-3","Head_and_Neck-5-4","Head_and_Neck-5-5","Head_and_Neck-95-1","Head_and_Neck-95-2","Head_and_Neck-95-3","Head_and_Neck-95-4","Head_and_Neck-95-5","Head_and_Neck-95-6","Head_and_Neck-95-7","Head_and_Neck-95-8","Head_and_Neck-95-9","Head_and_Neck-95-10","Head_and_Neck-95-11","Head_and_Neck-95-12","Head_and_Neck-95-13","Head_and_Neck-95-14","Head_and_Neck-95-15","Head_and_Neck-95-16","Head_and_Neck-95-17","Head_and_Neck-95-18","Head_and_Neck-95-19","Head_and_Neck-95-20","Head_and_Neck-95-21","Head_and_Neck-95-22","Head_and_Neck-95-23","Head_and_Neck-95-24","Head_and_Neck-95-25","Head_and_Neck-95-26","Head_and_Neck-95-27","Head_and_Neck-95-28","Head_and_Neck-95-29","Head_and_Neck-95-30","Head_and_Neck-95-31","Head_and_Neck-95-32","Head_and_Neck-95-33","Head_and_Neck-95-34","Head_and_Neck-95-35","Head_and_Neck-95-36","Head_and_Neck-95-37","Head_and_Neck-95-38","Head_and_Neck-95-39","Head_and_Neck-95-40","Head_and_Neck-95-41","Head_and_Neck-95-42","Head_and_Neck-95-43","Head_and_Neck-95-44","Head_and_Neck-95-45","Head_and_Neck-95-46","Head_and_Neck-95-47","Head_and_Neck-95-48","Head_and_Neck-95-49","Head_and_Neck-95-50","Head_and_Neck-95-51","Head_and_Neck-95-52","Head_and_Neck-95-53","Head_and_Neck-95-54","Head_and_Neck-95-55","Head_and_Neck-95-56","Head_and_Neck-95-57","Head_and_Neck-95-58","Head_and_Neck-95-59","Head_and_Neck-95-60","Head_and_Neck-95-61","Head_and_Neck-95-62","Head_and_Neck-95-63","Head_and_Neck-95-64","Head_and_Neck-95-65","Head_and_Neck-95-66","Head_and_Neck-95-67","Head_and_Neck-95-68","Head_and_Neck-95-69","Head_and_Neck-95-70","Head_and_Neck-95-71","Head_and_Neck-95-72","Head_and_Neck-95-73","Head_and_Neck-95-74","Head_and_Neck-95-75","Head_and_Neck-95-76","Head_and_Neck-95-77","Head_and_Neck-95-78","Head_and_Neck-95-79","Head_and_Neck-95-80","Head_and_Neck-95-81","Head_and_Neck-95-82","Head_and_Neck-95-83","Head_and_Neck-95-84","Head_and_Neck-95-85","Head_and_Neck-95-86","Head_and_Neck-95-87","Head_and_Neck-95-88","Head_and_Neck-95-89","Head_and_Neck-95-90","Head_and_Neck-95-91","Head_and_Neck-95-92","Head_and_Neck-95-93","Head_and_Neck-95-94","Head_and_Neck-95-95"]},{"slug":"Thorax","title":"Thorax","group":"Anatomy","count":79,"ids":["Thorax-79-1","Thorax-79-2","Thorax-79-3","Thorax-79-4","Thorax-79-5","Thorax-79-6","Thorax-79-7","Thorax-79-8","Thorax-79-9","Thorax-79-10","Thorax-79-11","Thorax-79-12","Thorax-79-13","Thorax-79-14","Thorax-79-15","Thorax-79-16","Thorax-79-17","Thorax-79-18","Thorax-79-19","Thorax-79-20","Thorax-79-21","Thorax-79-22","Thorax-79-23","Thorax-79-24","Thorax-79-25","Thorax-79-26","Thorax-79-27","Thorax-79-28","Thorax-79-29","Thorax-79-30","Thorax-79-31","Thorax-79-32","Thorax-79-33","Thorax-79-34","Thorax-79-35","Thorax-79-36","Thorax-79-37","Thorax-79-38","Thorax-79-39","Thorax-79-40","Thorax-79-41","Thorax-79-42","Thorax-79-43","Thorax-79-44","Thorax-79-45","Thorax-79-46","Thorax-79-47","Thorax-79-48","Thorax-79-49","Thorax-79-50","Thorax-79-51","Thorax-79-52","Thorax-79-53","Thorax-79-54","Thorax-79-55","Thorax-79-56","Thorax-79-57","Thorax-79-58","Thorax-79-59","Thorax-79-60","Thorax-79-61","Thorax-79-62","Thorax-79-63","Thorax-79-64","Thorax-79-65","Thorax-79-66","Thorax-79-67","Thorax-79-68","Thorax-79-69","Thorax-79-70","Thorax-79-71","Thorax-79-72","Thorax-79-73","Thorax-79-74","Thorax-79-75","Thorax-79-76","Thorax-79-77","Thorax-79-78","Thorax-79-79"]},{"slug":"Upper_Limb","title":"Upper Limb","group":"Anatomy","count":53,"ids":["Upper_Limb-100-1","Upper_Limb-52-1","Upper_Limb-52-2","Upper_Limb-52-3","Upper_Limb-52-4","Upper_Limb-52-5","Upper_Limb-52-6","Upper_Limb-52-7","Upper_Limb-52-8","Upper_Limb-52-9","Upper_Limb-52-10","Upper_Limb-52-11","Upper_Limb-52-12","Upper_Limb-52-13","Upper_Limb-52-14","Upper_Limb-52-15","Upper_Limb-52-16","Upper_Limb-52-17","Upper_Limb-52-18","Upper_Limb-52-19","Upper_Limb-52-20","Upper_Limb-52-21","Upper_Limb-52-22","Upper_Limb-52-23","Upper_Limb-52-24","Upper_Limb-52-25","Upper_Limb-52-26","Upper_Limb-52-27","Upper_Limb-52-28","Upper_Limb-52-29","Upper_Limb-52-30","Upper_Limb-52-31","Upper_Limb-52-32","Upper_Limb-52-33","Upper_Limb-52-34","Upper_Limb-52-35","Upper_Limb-52-36","Upper_Limb-52-37","Upper_Limb-52-38","Upper_Limb-52-39","Upper_Limb-52-40","Upper_Limb-52-41","Upper_Limb-52-42","Upper_Limb-52-43","Upper_Limb-52-44","Upper_Limb-52-45","Upper_Limb-52-46","Upper_Limb-52-47","Upper_Limb-52-48","Upper_Limb-52-49","Upper_Limb-52-50","Upper_Limb-52-51","Upper_Limb-52-52"]},{"slug":"Upper_Limb_and_Breast","title":"Upper Limb and Breast","group":"Anatomy","count":25,"ids":["Upper_Limb_and_Breast-25-1","Upper_Limb_and_Breast-25-2","Upper_Limb_and_Breast-25-3","Upper_Limb_and_Breast-25-4","Upper_Limb_and_Breast-25-5","Upper_Limb_and_Breast-25-6","Upper_Limb_and_Breast-25-7","Upper_Limb_and_Breast-25-8","Upper_Limb_and_Breast-25-9","Upper_Limb_and_Breast-25-10","Upper_Limb_and_Breast-25-11","Upper_Limb_and_Breast-25-12","Upper_Limb_and_Breast-25-13","Upper_Limb_and_Breast-25-14","Upper_Limb_and_Breast-25-15","Upper_Limb_and_Breast-25-16","Upper_Limb_and_Breast-25-17","Upper_Limb_and_Breast-25-18","Upper_Limb_and_Breast-25-19","Upper_Limb_and_Breast-25-20","Upper_Limb_and_Breast-25-21","Upper_Limb_and_Breast-25-22","Upper_Limb_and_Breast-25-23","Upper_Limb_and_Breast-25-24","Upper_Limb_and_Breast-25-25"]},{"slug":"Lower_Limb","title":"Lower Limb","group":"Anatomy","count":76,"ids":["Lower_Limb-76-1","Lower_Limb-76-2","Lower_Limb-76-3","Lower_Limb-76-4","Lower_Limb-76-5","Lower_Limb-76-6","Lower_Limb-76-7","Lower_Limb-76-8","Lower_Limb-76-9","Lower_Limb-76-10","Lower_Limb-76-11","Lower_Limb-76-12","Lower_Limb-76-13","Lower_Limb-76-14","Lower_Limb-76-15","Lower_Limb-76-16","Lower_Limb-76-17","Lower_Limb-76-18","Lower_Limb-76-19","Lower_Limb-76-20","Lower_Limb-76-21","Lower_Limb-76-22","Lower_Limb-76-23","Lower_Limb-76-24","Lower_Limb-76-25","Lower_Limb-76-26","Lower_Limb-76-27","Lower_Limb-76-28","Lower_Limb-76-29","Lower_Limb-76-30","Lower_Limb-76-31","Lower_Limb-76-32","Lower_Limb-76-33","Lower_Limb-76-34","Lower_Limb-76-35","Lower_Limb-76-36","Lower_Limb-76-37","Lower_Limb-76-38","Lower_Limb-76-39","Lower_Limb-76-40","Lower_Limb-76-41","Lower_Limb-76-42","Lower_Limb-76-43","Lower_Limb-76-44","Lower_Limb-76-45","Lower_Limb-76-46","Lower_Limb-76-47","Lower_Limb-76-48","Lower_Limb-76-49","Lower_Limb-76-50","Lower_Limb-76-51","Lower_Limb-76-52","Lower_Limb-76-53","Lower_Limb-76-54","Lower_Limb-76-55","Lower_Limb-76-56","Lower_Limb-76-57","Lower_Limb-76-58","Lower_Limb-76-59","Lower_Limb-76-60","Lower_Limb-76-61","Lower_Limb-76-62","Lower_Limb-76-63","Lower_Limb-76-64","Lower_Limb-76-65","Lower_Limb-76-66","Lower_Limb-76-67","Lower_Limb-76-68","Lower_Limb-76-69","Lower_Limb-76-70","Lower_Limb-76-71","Lower_Limb-76-72","Lower_Limb-76-73","Lower_Limb-76-74","Lower_Limb-76-75","Lower_Limb-76-76"]},{"slug":"Abdominal_wall","title":"Abdominal Wall","group":"Anatomy","count":38,"ids":["Abdominal_wall-38-1","Abdominal_wall-38-2","Abdominal_wall-38-3","Abdominal_wall-38-4","Abdominal_wall-38-5","Abdominal_wall-38-6","Abdominal_wall-38-7","Abdominal_wall-38-8","Abdominal_wall-38-9","Abdominal_wall-38-10","Abdominal_wall-38-11","Abdominal_wall-38-12","Abdominal_wall-38-13","Abdominal_wall-38-14","Abdominal_wall-38-15","Abdominal_wall-38-16","Abdominal_wall-38-17","Abdominal_wall-38-18","Abdominal_wall-38-19","Abdominal_wall-38-20","Abdominal_wall-38-21","Abdominal_wall-38-22","Abdominal_wall-38-23","Abdominal_wall-38-24","Abdominal_wall-38-25","Abdominal_wall-38-26","Abdominal_wall-38-27","Abdominal_wall-38-28","Abdominal_wall-38-29","Abdominal_wall-38-30","Abdominal_wall-38-31","Abdominal_wall-38-32","Abdominal_wall-38-33","Abdominal_wall-38-34","Abdominal_wall-38-35","Abdominal_wall-38-36","Abdominal_wall-38-37","Abdominal_wall-38-38"]},{"slug":"Abdominal_Viscera","title":"Abdominal Viscera","group":"Anatomy","count":44,"ids":["Abdominal_Viscera-44-1","Abdominal_Viscera-44-2","Abdominal_Viscera-44-3","Abdominal_Viscera-44-4","Abdominal_Viscera-44-5","Abdominal_Viscera-44-6","Abdominal_Viscera-44-7","Abdominal_Viscera-44-8","Abdominal_Viscera-44-9","Abdominal_Viscera-44-10","Abdominal_Viscera-44-11","Abdominal_Viscera-44-12","Abdominal_Viscera-44-13","Abdominal_Viscera-44-14","Abdominal_Viscera-44-15","Abdominal_Viscera-44-16","Abdominal_Viscera-44-17","Abdominal_Viscera-44-18","Abdominal_Viscera-44-19","Abdominal_Viscera-44-20","Abdominal_Viscera-44-21","Abdominal_Viscera-44-22","Abdominal_Viscera-44-23","Abdominal_Viscera-44-24","Abdominal_Viscera-44-25","Abdominal_Viscera-44-26","Abdominal_Viscera-44-27","Abdominal_Viscera-44-28","Abdominal_Viscera-44-29","Abdominal_Viscera-44-30","Abdominal_Viscera-44-31","Abdominal_Viscera-44-32","Abdominal_Viscera-44-33","Abdominal_Viscera-44-34","Abdominal_Viscera-44-35","Abdominal_Viscera-44-36","Abdominal_Viscera-44-37","Abdominal_Viscera-44-38","Abdominal_Viscera-44-39","Abdominal_Viscera-44-40","Abdominal_Viscera-44-41","Abdominal_Viscera-44-42","Abdominal_Viscera-44-43","Abdominal_Viscera-44-44"]},{"slug":"Abdominal_Vessel","title":"Abdominal Vessels","group":"Anatomy","count":47,"ids":["Abdominal_Vessel-47-1","Abdominal_Vessel-47-2","Abdominal_Vessel-47-3","Abdominal_Vessel-47-4","Abdominal_Vessel-47-5","Abdominal_Vessel-47-6","Abdominal_Vessel-47-7","Abdominal_Vessel-47-8","Abdominal_Vessel-47-9","Abdominal_Vessel-47-10","Abdominal_Vessel-47-11","Abdominal_Vessel-47-12","Abdominal_Vessel-47-13","Abdominal_Vessel-47-14","Abdominal_Vessel-47-15","Abdominal_Vessel-47-16","Abdominal_Vessel-47-17","Abdominal_Vessel-47-18","Abdominal_Vessel-47-19","Abdominal_Vessel-47-20","Abdominal_Vessel-47-21","Abdominal_Vessel-47-22","Abdominal_Vessel-47-23","Abdominal_Vessel-47-24","Abdominal_Vessel-47-25","Abdominal_Vessel-47-26","Abdominal_Vessel-47-27","Abdominal_Vessel-47-28","Abdominal_Vessel-47-29","Abdominal_Vessel-47-30","Abdominal_Vessel-47-31","Abdominal_Vessel-47-32","Abdominal_Vessel-47-33","Abdominal_Vessel-47-34","Abdominal_Vessel-47-35","Abdominal_Vessel-47-36","Abdominal_Vessel-47-37","Abdominal_Vessel-47-38","Abdominal_Vessel-47-39","Abdominal_Vessel-47-40","Abdominal_Vessel-47-41","Abdominal_Vessel-47-42","Abdominal_Vessel-47-43","Abdominal_Vessel-47-44","Abdominal_Vessel-47-45","Abdominal_Vessel-47-46","Abdominal_Vessel-47-47"]},{"slug":"Pelvis","title":"Pelvis","group":"Anatomy","count":19,"ids":["Pelvis-19-1","Pelvis-19-2","Pelvis-19-3","Pelvis-19-4","Pelvis-19-5","Pelvis-19-6","Pelvis-19-7","Pelvis-19-8","Pelvis-19-9","Pelvis-19-10","Pelvis-19-11","Pelvis-19-12","Pelvis-19-13","Pelvis-19-14","Pelvis-19-15","Pelvis-19-16","Pelvis-19-17","Pelvis-19-18","Pelvis-19-19"]},{"slug":"Perineum","title":"Perineum","group":"Anatomy","count":19,"ids":["Perineum-19-1","Perineum-19-2","Perineum-19-3","Perineum-19-4","Perineum-19-5","Perineum-19-6","Perineum-19-7","Perineum-19-8","Perineum-19-9","Perineum-19-10","Perineum-19-11","Perineum-19-12","Perineum-19-13","Perineum-19-14","Perineum-19-15","Perineum-19-16","Perineum-19-17","Perineum-19-18","Perineum-19-19"]},{"slug":"Spine","title":"Spine","group":"Anatomy","count":22,"ids":["Spine-22-1","Spine-22-2","Spine-22-3","Spine-22-4","Spine-22-5","Spine-22-6","Spine-22-7","Spine-22-8","Spine-22-9","Spine-22-10","Spine-22-11","Spine-22-12","Spine-22-13","Spine-22-14","Spine-22-15","Spine-22-16","Spine-22-17","Spine-22-18","Spine-22-19","Spine-22-20","Spine-22-21","Spine-22-22"]},{"slug":"Neuroanatomy","title":"Neuroanatomy","group":"Anatomy","count":32,"ids":["Neuroanatomy-32-1","Neuroanatomy-32-2","Neuroanatomy-32-3","Neuroanatomy-32-4","Neuroanatomy-32-5","Neuroanatomy-32-6","Neuroanatomy-32-7","Neuroanatomy-32-8","Neuroanatomy-32-9","Neuroanatomy-32-10","Neuroanatomy-32-11","Neuroanatomy-32-12","Neuroanatomy-32-13","Neuroanatomy-32-14","Neuroanatomy-32-15","Neuroanatomy-32-16","Neuroanatomy-32-17","Neuroanatomy-32-18","Neuroanatomy-32-19","Neuroanatomy-32-20","Neuroanatomy-32-21","Neuroanatomy-32-22","Neuroanatomy-32-23","Neuroanatomy-32-24","Neuroanatomy-32-25","Neuroanatomy-32-26","Neuroanatomy-32-27","Neuroanatomy-32-28","Neuroanatomy-32-29","Neuroanatomy-32-30","Neuroanatomy-32-31","Neuroanatomy-32-32"]},{"slug":"Autonomic_Nervous_System","title":"Autonomic Nervous System","group":"Anatomy","count":15,"ids":["Autonomic_Nervous_System-16-1","Autonomic_Nervous_System-16-3","Autonomic_Nervous_System-16-4","Autonomic_Nervous_System-16-5","Autonomic_Nervous_System-16-6","Autonomic_Nervous_System-16-7","Autonomic_Nervous_System-16-8","Autonomic_Nervous_System-16-9","Autonomic_Nervous_System-16-10","Autonomic_Nervous_System-16-11","Autonomic_Nervous_System-16-12","Autonomic_Nervous_System-16-13","Autonomic_Nervous_System-16-14","Autonomic_Nervous_System-16-15","Autonomic_Nervous_System-16-16"]},{"slug":"Surface","title":"Surface Anatomy","group":"Anatomy","count":22,"ids":["Surface-22-1","Surface-22-2","Surface-22-3","Surface-22-4","Surface-22-5","Surface-22-6","Surface-22-7","Surface-22-8","Surface-22-9","Surface-22-10","Surface-22-11","Surface-22-12","Surface-22-13","Surface-22-14","Surface-22-15","Surface-22-16","Surface-22-17","Surface-22-18","Surface-22-19","Surface-22-20","Surface-22-21","Surface-22-22"]},{"slug":"Data_Interpretation_and_Audit","title":"Data Interpretation and Audit","group":"Principles of surgery","count":24,"ids":["Data_Interpretation_and_Audit-24-1","Data_Interpretation_and_Audit-24-2","Data_Interpretation_and_Audit-24-3","Data_Interpretation_and_Audit-24-4","Data_Interpretation_and_Audit-24-5","Data_Interpretation_and_Audit-24-6","Data_Interpretation_and_Audit-24-7","Data_Interpretation_and_Audit-24-8","Data_Interpretation_and_Audit-24-9","Data_Interpretation_and_Audit-24-10","Data_Interpretation_and_Audit-24-11","Data_Interpretation_and_Audit-24-12","Data_Interpretation_and_Audit-24-13","Data_Interpretation_and_Audit-24-14","Data_Interpretation_and_Audit-24-15","Data_Interpretation_and_Audit-24-16","Data_Interpretation_and_Audit-24-17","Data_Interpretation_and_Audit-24-18","Data_Interpretation_and_Audit-24-19","Data_Interpretation_and_Audit-24-20","Data_Interpretation_and_Audit-24-21","Data_Interpretation_and_Audit-24-22","Data_Interpretation_and_Audit-24-23","Data_Interpretation_and_Audit-24-24"]},{"slug":"Medicolegal_Aspects_of_Surgery","title":"Medicolegal Aspects of Surgery","group":"Principles of surgery","count":20,"ids":["Medicolegal_Aspects_of_Surgery-20-1","Medicolegal_Aspects_of_Surgery-20-2","Medicolegal_Aspects_of_Surgery-20-3","Medicolegal_Aspects_of_Surgery-20-4","Medicolegal_Aspects_of_Surgery-20-5","Medicolegal_Aspects_of_Surgery-20-6","Medicolegal_Aspects_of_Surgery-20-7","Medicolegal_Aspects_of_Surgery-20-8","Medicolegal_Aspects_of_Surgery-20-9","Medicolegal_Aspects_of_Surgery-20-10","Medicolegal_Aspects_of_Surgery-20-11","Medicolegal_Aspects_of_Surgery-20-12","Medicolegal_Aspects_of_Surgery-20-13","Medicolegal_Aspects_of_Surgery-20-14","Medicolegal_Aspects_of_Surgery-20-15","Medicolegal_Aspects_of_Surgery-20-16","Medicolegal_Aspects_of_Surgery-20-17","Medicolegal_Aspects_of_Surgery-20-18","Medicolegal_Aspects_of_Surgery-20-19","Medicolegal_Aspects_of_Surgery-20-20"]}]};
+const app = document.getElementById('app');
+const actions = document.getElementById('actions');
+const cache = {};
+const SALT = Uint8Array.from(atob("oHfgD0wUs8xbKyrDTpVf7Q=="), c => c.charCodeAt(0));
+let KEY = null;
+async function deriveKey(pass){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt:SALT, iterations:200000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+}
+async function decryptFile(path){
+  const buf = new Uint8Array(await (await fetch(path)).arrayBuffer());
+  return crypto.subtle.decrypt({name:'AES-GCM', iv:buf.slice(0,12)}, KEY, buf.slice(12));
+}
+function normPass(p){ return (p || '').normalize('NFKC').toLowerCase().replace(/[‐-―−]/g, '-').replace(/\s+/g, ''); }
+async function tryUnlock(pass){
+  if (!window.crypto || !crypto.subtle) return 'nocrypto';
+  let res;
+  try { res = await fetch('data/check.bin'); } catch(e) { return 'nofile'; }
+  if (!res.ok) return 'nofile';
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf.length !== 30) return 'nofile';
+  try {
+    const k = await deriveKey(normPass(pass));
+    await crypto.subtle.decrypt({name:'AES-GCM', iv:buf.slice(0,12)}, k, buf.slice(12));
+    KEY = k; return 'ok';
+  } catch(e) { KEY = null; return 'wrong'; }
+}
+const LOCK_MSG = {
+  wrong: "That passcode didn't work. Check it and try again.",
+  nofile: "The app couldn't load its question files. Make sure the data and icons folders were uploaded as folders next to index.html, then reload.",
+  nocrypto: "Open this app from its https web link in Safari. It can't unlock when opened as a file."
+};
+function lockScreen(msg){
+  actions.hidden = true;
+  app.innerHTML = `<form class="lock" id="lockForm" autocomplete="off">
+    <h1>Anatomy SBA Practice</h1>
+    <p>Enter your passcode to unlock the question bank. You only need to do this once on each device.</p>
+    <input id="pass" type="password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Passcode" aria-label="Passcode">
+    <p class="err" id="err">${msg || ''}</p>
+    <button class="btn go" type="submit">Unlock</button></form>`;
+  const f = document.getElementById('lockForm');
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const p = document.getElementById('pass').value.trim();
+    document.getElementById('err').textContent = 'Checking…';
+    const r = await tryUnlock(p);
+    if (r === 'ok') { try { localStorage.setItem('sba-pass', p); } catch(e) {} home(); }
+    else document.getElementById('err').textContent = LOCK_MSG[r];
+  };
+}
+async function boot(){
+  let p = null; try { p = localStorage.getItem('sba-pass'); } catch(e) {}
+  if (p && await tryUnlock(p) === 'ok') home(); else lockScreen();
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+const store = {
+  get(){ try { return JSON.parse(localStorage.getItem('pastest-progress') || '{}'); } catch(e){ return {}; } },
+  set(v){ try { localStorage.setItem('pastest-progress', JSON.stringify(v)); } catch(e){} }
+};
+let progress = store.get();          // id -> chosen letter
+let S = null;                         // current session {title, list:[{topic,q}], i}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function loadTopic(slug){
+  if (cache[slug]) return cache[slug];
+  const d = JSON.parse(new TextDecoder().decode(await decryptFile('data/' + slug + '.bin')));
+  cache[slug] = d; return d;
+}
+function topicStats(t){
+  let a = 0, c = 0;
+  for (const id of t.ids){ const p = progress[id]; if (p){ a++; if (p.ok) c++; } }
+  return {a, c};
+}
+function home(){
+  actions.hidden = true;
+  let tot = 0, ans = 0, cor = 0;
+  MANIFEST.topics.forEach(t => { const s = topicStats(t); tot += t.count; ans += s.a; cor += s.c; });
+  const wrongN = Object.values(progress).filter(p => !p.ok).length;
+  const groups = {};
+  MANIFEST.topics.forEach(t => (groups[t.group] = groups[t.group] || []).push(t));
+  let h = `<header class="brand"><div><h1>Anatomy SBA Practice</h1>
+    <p>${tot} single-best-answer questions from your Pastest screenshots. Tap an option to see the answer and explanation.</p></div>
+    <div class="stats"><span><b>${ans}</b> answered</span><span><b>${ans ? Math.round(100*cor/ans) : 0}%</b> correct</span></div></header>
+  <div class="modes">
+    <button class="mode primary" type="button" data-mode="mix"><strong>Mixed practice</strong><span>20 random questions from every topic</span></button>
+    <button class="mode" type="button" data-mode="unseen"><strong>Unseen only</strong><span>${tot - ans} you haven't answered yet</span></button>
+    <button class="mode" type="button" data-mode="wrong" ${wrongN ? '' : 'disabled'}><strong>Review mistakes</strong><span>${wrongN} answered wrongly</span></button>
+  </div>`;
+  for (const g of Object.keys(groups)){
+    h += `<h2 class="label group-h">${esc(g)}</h2><div class="topics">`;
+    for (const t of groups[g]){
+      const s = topicStats(t);
+      h += `<button class="topic" type="button" data-topic="${t.slug}">
+        <span class="name">${esc(t.title)}</span>
+        <span class="score mono">${s.a}/${t.count}</span>
+        <span class="meta">${t.count} questions${s.a ? ` · ${Math.round(100*s.c/s.a)}% correct` : ''}</span>
+        <span class="bar"><i class="c" style="width:${100*s.c/t.count}%"></i><i class="w" style="width:${100*(s.a-s.c)/t.count}%"></i></span>
+      </button>`;
+    }
+    h += `</div>`;
+  }
+  h += `<p class="foot">Questions, answers and explanations were read from the screenshots by text recognition, so expect the odd typo. Your progress is saved on this device only.
+    <button class="linkbtn" type="button" id="resetBtn">Reset progress</button></p>`;
+  app.innerHTML = h;
+  window.scrollTo(0, 0);
+  app.querySelectorAll('[data-topic]').forEach(b => b.onclick = () => startTopic(b.dataset.topic));
+  app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => startMode(b.dataset.mode));
+  const rb = document.getElementById('resetBtn');
+  rb.onclick = () => {
+    if (rb.dataset.armed){ progress = {}; store.set(progress); home(); }
+    else { rb.dataset.armed = '1'; rb.textContent = 'Tap again to erase all progress'; }
+  };
+}
+async function startTopic(slug){
+  const d = await loadTopic(slug);
+  S = {title: d.title, list: d.questions.map(q => ({topic: d, q})), i: 0};
+  const first = S.list.findIndex(x => !progress[x.q.id]);
+  S.i = first > 0 ? first : 0;
+  render();
+}
+function shuffle(a){ for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+async function startMode(mode){
+  app.innerHTML = '<p class="loading">Loading questions…</p>';
+  const all = [];
+  for (const t of MANIFEST.topics){ const d = await loadTopic(t.slug); d.questions.forEach(q => all.push({topic: d, q})); }
+  let list, title;
+  if (mode === 'mix'){ list = shuffle(all.filter(x => !x.q.noStem)).slice(0, 20); title = 'Mixed practice'; }
+  else if (mode === 'unseen'){ list = shuffle(all.filter(x => !progress[x.q.id])); title = 'Unseen questions'; }
+  else { list = all.filter(x => progress[x.q.id] && !progress[x.q.id].ok); title = 'Review mistakes'; }
+  if (!list.length){ home(); return; }
+  S = {title, list, i: 0, review: mode === 'wrong'};
+  render();
+}
+function paras(arr){ return (arr || []).map(p => `<p>${esc(p)}</p>`).join(''); }
+function figs(q, where){
+  return (q.figs || []).filter(f => f.where === where).map(f => `<figure><img src="${f.src}" alt="Figure from the original question" loading="lazy" width="${f.w}" height="${f.h}"></figure>`).join('');
+}
+function render(){
+  if (S.i >= S.list.length) return finish();
+  const {topic, q} = S.list[S.i];
+  const chosen = S.review ? null : (progress[q.id] && progress[q.id].c);
+  const answered = !!chosen;
+  let h = `<div class="top">
+      <button class="iconbtn" type="button" id="homeBtn" aria-label="Back to topics">← Topics</button>
+      <div class="where"><div class="t">${esc(S.title)}</div><div class="s mono">${S.i+1} of ${S.list.length}${S.title !== topic.title ? ' · ' + esc(topic.title) : ''}</div>
+      <div class="progress"><i style="width:${100*(S.i+1)/S.list.length}%"></i></div></div>
+    </div>
+    <article class="card">
+      ${q.noStem ? `<div class="note">The question text wasn't captured in the screenshots for this one. The options and explanations below are complete.</div>` : ''}
+      <div class="stem">${paras(q.stem)}</div>
+      ${figs(q, 'stem')}
+      <div class="opts" role="list">`;
+  for (const L of Object.keys(q.options)){
+    let cls = '';
+    if (answered){ if (L === q.answer) cls = 'correct'; else if (L === chosen) cls = 'wrong'; else cls = 'dim'; }
+    h += `<button class="opt ${cls}" type="button" data-letter="${L}" ${answered ? 'disabled' : ''} role="listitem"><span class="L">${L}</span><span>${esc(q.options[L])}</span></button>`;
+  }
+  h += `</div></article><div id="reveal">${answered ? reveal(q, chosen) : ''}</div>
+    <p class="src">Source: ${esc(topic.title)} · question ${q.n}${q.of ? ' of ' + q.of : ''}</p>`;
+  app.innerHTML = h;
+  window.scrollTo(0, 0);
+  document.getElementById('homeBtn').onclick = home;
+  app.querySelectorAll('.opt').forEach(b => b.onclick = () => choose(b.dataset.letter));
+  app.querySelectorAll('figure img').forEach(im => im.onclick = () => zoom(im.src));
+  actions.hidden = false;
+  document.getElementById('prevBtn').disabled = S.i === 0;
+  document.getElementById('nextBtn').textContent = S.i === S.list.length - 1 ? 'Finish' : (answered ? 'Next' : 'Skip');
+}
+function reveal(q, chosen){
+  const ok = chosen === q.answer;
+  let h = `<div class="verdict ${ok ? 'ok' : 'bad'}">${ok ? '✓ Correct' : '✗ Not quite'} — the answer is ${q.answer}</div>${q.note ? `<div class="note">${esc(q.note)}</div>` : ''}<div class="exp">`;
+  const order = [q.answer, ...Object.keys(q.options).filter(L => L !== q.answer)];
+  if (q.exp.O && q.exp.O.length){
+    h += `<section class="xp"><h3>Overall explanation</h3><div class="body">${paras(q.exp.O)}${figs(q, 'O')}</div></section>`;
+  }
+  for (const L of order){
+    const isC = L === q.answer, isW = L === chosen && !isC;
+    const body = (q.exp[L] && q.exp[L].length) ? paras(q.exp[L]) : (q.exp.O ? '' : `<p class="empty">No separate explanation was shown for this option.</p>`);
+    if (!body && !isC && !figs(q, L)) continue;
+    h += `<section class="xp ${isC ? 'is-correct' : ''} ${isW ? 'is-chosen' : ''}">
+      <h3><span class="mono">${L}</span><span>${esc(q.options[L] || '')}</span><span class="tag">${isC ? 'Correct' : isW ? 'Your answer' : ''}</span></h3>
+      <div class="body">${body || ''}${figs(q, L)}</div></section>`;
+  }
+  h += figs(q, 'pre');
+  return h + `</div>`;
+}
+function choose(L){
+  const {q} = S.list[S.i];
+  progress[q.id] = {c: L, ok: L === q.answer};
+  store.set(progress);
+  app.querySelectorAll('.opt').forEach(b => {
+    b.disabled = true;
+    const x = b.dataset.letter;
+    b.classList.add(x === q.answer ? 'correct' : x === L ? 'wrong' : 'dim');
+  });
+  const r = document.getElementById('reveal');
+  r.innerHTML = reveal(q, L);
+  r.querySelectorAll('figure img').forEach(im => im.onclick = () => zoom(im.src));
+  document.getElementById('nextBtn').textContent = S.i === S.list.length - 1 ? 'Finish' : 'Next';
+  r.firstElementChild.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+}
+function finish(){
+  actions.hidden = true;
+  let a = 0, c = 0;
+  S.list.forEach(x => { const p = progress[x.q.id]; if (p){ a++; if (p.ok) c++; } });
+  app.innerHTML = `<div class="card done"><div class="label">${esc(S.title)}</div>
+    <div class="big mono">${c}/${a}</div><p>correct out of the questions you answered</p>
+    <div class="modes" style="margin-top:18px"><button class="mode primary" type="button" id="againBtn"><strong>Back to topics</strong><span>Pick another set</span></button></div></div>`;
+  document.getElementById('againBtn').onclick = home;
+}
+function zoom(src){ const lb = document.getElementById('lightbox'); document.getElementById('lbImg').src = src; lb.hidden = false; }
+document.getElementById('lightbox').onclick = () => document.getElementById('lightbox').hidden = true;
+document.getElementById('prevBtn').onclick = () => { if (S.i > 0){ S.i--; render(); } };
+document.getElementById('nextBtn').onclick = () => { S.i++; render(); };
+document.addEventListener('keydown', e => {
+  if (!S || actions.hidden) return;
+  if (/^[a-e]$/i.test(e.key)){ const b = app.querySelector(`.opt[data-letter="${e.key.toUpperCase()}"]`); if (b && !b.disabled) b.click(); }
+  if (e.key === 'ArrowRight') document.getElementById('nextBtn').click();
+  if (e.key === 'ArrowLeft') document.getElementById('prevBtn').click();
+});
+boot();
+</script>
+</body></html>
